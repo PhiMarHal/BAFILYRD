@@ -1,25 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>BAFILYRD</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { 
-      width: 100%; 
-      height: 100%; 
-      overflow: hidden; 
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
       background: #1a1a1a;
       display: flex;
       align-items: center;
       justify-content: center;
     }
+
     .game-container {
       position: relative;
       overflow: hidden;
       background: #0a0a0a;
     }
+
     .background {
       position: absolute;
       top: 0;
@@ -29,6 +38,7 @@
       background: #0a0a0a;
       overflow: hidden;
     }
+
     .column {
       position: absolute;
       display: flex;
@@ -39,49 +49,70 @@
       white-space: pre;
       transform-origin: top;
     }
+
     .column:nth-child(8n+1) {
       color: #e0e0e0;
       animation: scrollDown 5s linear infinite;
     }
+
     .column:nth-child(8n+2) {
       color: #a0a0a0;
       animation: scrollUp 5s linear infinite;
     }
+
     .column:nth-child(8n+3) {
       color: #e0e0e0;
       animation: scrollDown 4s linear infinite;
     }
+
     .column:nth-child(8n+4) {
       color: #a0a0a0;
       animation: scrollUp 4s linear infinite;
     }
+
     .column:nth-child(8n+5) {
       color: #e0e0e0;
       animation: scrollDown 3s linear infinite;
     }
+
     .column:nth-child(8n+6) {
       color: #a0a0a0;
       animation: scrollUp 3s linear infinite;
     }
+
     .column:nth-child(8n+7) {
       color: #e0e0e0;
       animation: scrollDown 2s linear infinite;
     }
+
     .column:nth-child(8n+8) {
       color: #a0a0a0;
       animation: scrollUp 2s linear infinite;
     }
+
     @keyframes scrollDown {
-      0% { transform: translateY(-63px) scaleY(0.7); }
-      100% { transform: translateY(0) scaleY(0.7); }
+      0% {
+        transform: translateY(-63px) scaleY(0.7);
+      }
+
+      100% {
+        transform: translateY(0) scaleY(0.7);
+      }
     }
+
     @keyframes scrollUp {
-      0% { transform: translateY(0) scaleY(0.7); }
-      100% { transform: translateY(-63px) scaleY(0.7); }
+      0% {
+        transform: translateY(0) scaleY(0.7);
+      }
+
+      100% {
+        transform: translateY(-63px) scaleY(0.7);
+      }
     }
-    canvas { 
-      display: block; 
-      cursor: pointer; 
+
+    canvas {
+      display: block;
+      cursor: pointer;
       position: absolute;
       top: 0;
       left: 0;
@@ -89,7 +120,9 @@
       height: 100%;
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@farcade/game-sdk@latest/dist/index.min.js"></script>
 </head>
+
 <body>
   <div class="game-container" id="gameContainer">
     <div class="background" id="background"></div>
@@ -104,13 +137,13 @@
     // Base game dimensions (1:2 ratio)
     const BASE_WIDTH = 360;
     const BASE_HEIGHT = 720;
-    
+
     // Music configuration
     const BASE_URL = 'https://bafilyrd.loiyaa.com/';
     const isLocal = window.location.protocol === 'file:';
     const TRACK_COUNT = 4;
     const SILENCE_BETWEEN_TRACKS = 4000; // 4 seconds
-    
+
     // Music state
     let musicPlaylist = [];
     let currentTrackIndex = 0;
@@ -132,8 +165,8 @@
       const tracks = [];
       for (let i = 1; i <= TRACK_COUNT; i++) {
         const trackNum = i.toString().padStart(2, '0');
-        const trackPath = isLocal 
-          ? `assets/track${trackNum}.mp3` 
+        const trackPath = isLocal
+          ? `assets/track${trackNum}.mp3`
           : `${BASE_URL}assets/track${trackNum}.mp3`;
         tracks.push(trackPath);
       }
@@ -143,35 +176,35 @@
     // Play next track
     function playNextTrack() {
       if (!musicStarted) return;
-      
+
       // If we've played all tracks, reshuffle
       if (currentTrackIndex >= musicPlaylist.length) {
         musicPlaylist = generatePlaylist();
         currentTrackIndex = 0;
       }
-      
+
       const trackPath = musicPlaylist[currentTrackIndex];
       currentTrackIndex++;
-      
+
       if (audioElement) {
         audioElement.pause();
         audioElement.src = '';
       }
-      
+
       audioElement = new Audio(trackPath);
       audioElement.volume = 0.5;
-      
+
       audioElement.addEventListener('ended', () => {
         // Wait for silence period, then play next
         setTimeout(playNextTrack, SILENCE_BETWEEN_TRACKS);
       });
-      
+
       audioElement.addEventListener('error', (e) => {
         console.warn('Could not load track:', trackPath, e);
         // Try next track after a short delay
         setTimeout(playNextTrack, 1000);
       });
-      
+
       audioElement.play().catch(e => {
         console.warn('Playback failed:', e);
       });
@@ -193,11 +226,42 @@
         audioElement.pause();
       } else {
         if (musicStarted && gameState === 'playing') {
-          audioElement.play().catch(() => {});
+          audioElement.play().catch(() => { });
         }
       }
     });
-    
+
+    // Remix SDK Integration
+    function initRemixSDK() {
+      if (!window.FarcadeSDK) return;
+
+      // Signal ready when game loads
+      window.FarcadeSDK.singlePlayer.actions.ready();
+      console.log('Remix SDK: Game ready signal sent.');
+
+      // Handle play again requests from Remix
+      window.FarcadeSDK.on('play_again', () => {
+        console.log('Remix SDK: Play again requested.');
+        startGame();
+      });
+
+      // Handle mute/unmute requests from Remix
+      window.FarcadeSDK.on('toggle_mute', (data) => {
+        console.log('Remix SDK: Mute toggle requested, isMuted:', data.isMuted);
+        if (audioElement) {
+          audioElement.muted = data.isMuted;
+        }
+      });
+
+      console.log('Remix SDK: Event handlers registered.');
+    }
+
+    function signalGameOver(finalScore) {
+      if (!window.FarcadeSDK) return;
+      window.FarcadeSDK.singlePlayer.actions.gameOver({ score: finalScore });
+      console.log('Remix SDK: Game over signal sent with score:', finalScore);
+    }
+
     // Game constants
     const BIRD_SIZE = 30;
     const GRAVITY = 800;
@@ -237,7 +301,7 @@
 
     // Rune background
     const runes = ['ᛚ', 'ᚮ', 'ᛁ', 'ᚤ', 'ᛆ', 'ᛆ'];
-    
+
     function createColumns() {
       background.innerHTML = '';
       const columnWidth = 15;
@@ -245,7 +309,7 @@
       const runeHeight = 15 * 0.7;
       const runeSequenceHeight = 6 * runeHeight;
       const sequencesNeeded = Math.ceil(container.offsetHeight / runeSequenceHeight) + 3;
-      
+
       for (let i = 0; i < numColumns; i++) {
         const column = document.createElement('div');
         column.className = 'column';
@@ -265,10 +329,10 @@
     function resize() {
       const screenW = window.innerWidth;
       const screenH = window.innerHeight;
-      
+
       const aspectRatio = BASE_WIDTH / BASE_HEIGHT;
       let width, height;
-      
+
       if (screenW / screenH < aspectRatio) {
         width = screenW;
         height = screenW / aspectRatio;
@@ -276,17 +340,17 @@
         height = screenH;
         width = screenH * aspectRatio;
       }
-      
+
       // Use floor to avoid any subpixel issues
       width = Math.floor(width);
       height = Math.floor(height);
-      
+
       container.style.width = width + 'px';
       container.style.height = height + 'px';
       canvas.width = width;
       canvas.height = height;
       scale = width / BASE_WIDTH;
-      
+
       createColumns();
     }
 
@@ -364,11 +428,11 @@
       const now = performance.now();
       for (const bird of birds) {
         if (!bird.alive || bird.dying) continue;
-        
+
         const birdCenterX = bird.x + BIRD_SIZE / 2;
         const birdCenterY = bird.y + BIRD_SIZE / 2;
         const dist = Math.sqrt((x - birdCenterX) ** 2 + (y - birdCenterY) ** 2);
-        
+
         if (dist <= FLAP_RADIUS) {
           const delay = (dist / FLAP_RADIUS) * FLAP_MAX_DELAY;
           pendingFlaps.push({ birdId: bird.id, time: now + delay });
@@ -397,28 +461,28 @@
       // Update birds
       for (let i = birds.length - 1; i >= 0; i--) {
         const bird = birds[i];
-        
+
         if (bird.dying) {
           bird.vy += GRAVITY * 1.5 * deltaTime;
           bird.x += bird.vx * deltaTime;
           bird.y += bird.vy * deltaTime;
           bird.rotation += bird.spinVelocity * deltaTime;
-          
+
           if (bird.y > BASE_HEIGHT + 50 || bird.x < -50 || bird.x > BASE_WIDTH + 50) {
             birds.splice(i, 1);
           }
           continue;
         }
-        
+
         if (!bird.alive) {
           birds.splice(i, 1);
           continue;
         }
-        
+
         bird.vy += GRAVITY * deltaTime;
         bird.y += bird.vy * deltaTime;
         bird.rotation = Math.min(Math.max(bird.vy * 0.5, -30), 90);
-        
+
         // Ground collision (bottom of screen)
         if (bird.y > BASE_HEIGHT - BIRD_SIZE) {
           bird.alive = false;
@@ -429,7 +493,7 @@
           bird.spinVelocity = (Math.random() > 0.5 ? 1 : -1) * (600 + Math.random() * 400);
           continue;
         }
-        
+
         // Pipe collision
         const isInvulnerable = now - bird.spawnTime < 500;
         if (bird.y > 0 && !isInvulnerable) {
@@ -437,7 +501,7 @@
             const birdRight = bird.x + BIRD_SIZE;
             const birdBottom = bird.y + BIRD_SIZE;
             const pipeRight = pipe.x + PIPE_WIDTH;
-            
+
             if (birdRight > pipe.x && bird.x < pipeRight) {
               if (bird.y < pipe.gapY || birdBottom > pipe.gapY + PIPE_GAP) {
                 bird.alive = false;
@@ -456,7 +520,7 @@
       for (let i = pipes.length - 1; i >= 0; i--) {
         const pipe = pipes[i];
         pipe.x -= currentPipeSpeed * deltaTime;
-        
+
         if (!pipe.passed && pipe.x + PIPE_WIDTH < 30) {
           pipe.passed = true;
           const aliveBirds = birds.filter(b => b.alive && !b.dying);
@@ -466,7 +530,7 @@
             spawnBirdsFromPipe(pipe);
           }
         }
-        
+
         if (pipe.x < -PIPE_WIDTH) {
           pipes.splice(i, 1);
         }
@@ -487,6 +551,7 @@
       const aliveBirds = birds.filter(b => b.alive && !b.dying);
       if (aliveBirds.length === 0 && birds.length === 0) {
         gameState = 'gameover';
+        signalGameOver(score);
       }
     }
 
@@ -495,34 +560,34 @@
       ctx.save();
       ctx.translate((bird.x + BIRD_SIZE / 2) * scale, (bird.y + BIRD_SIZE / 2) * scale);
       ctx.rotate(bird.rotation * Math.PI / 180);
-      
+
       const s = scale;
       const size = BIRD_SIZE * s;
-      
+
       // Glow effect
       ctx.shadowColor = bird.color;
       ctx.shadowBlur = 10 * s;
-      
+
       // Body
       ctx.fillStyle = bird.color;
       ctx.beginPath();
       ctx.ellipse(0, 0, size / 2, size * 0.42, 0, 0, Math.PI * 2);
       ctx.fill();
-      
+
       ctx.shadowBlur = 0;
-      
+
       // Eye white
       ctx.fillStyle = 'white';
       ctx.beginPath();
       ctx.arc(size * 0.2, -size * 0.15, size * 0.12, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Eye pupil
       ctx.fillStyle = 'black';
       ctx.beginPath();
       ctx.arc(size * 0.25, -size * 0.15, size * 0.06, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Beak
       ctx.fillStyle = '#FF6B35';
       ctx.beginPath();
@@ -531,7 +596,7 @@
       ctx.lineTo(size * 0.55, size * 0.05);
       ctx.closePath();
       ctx.fill();
-      
+
       // Wing
       ctx.fillStyle = bird.color;
       ctx.globalAlpha = 0.8;
@@ -540,7 +605,7 @@
       ctx.ellipse(-size * 0.1, wingY, size * 0.15, size * 0.1, bird.vy < 0 ? -0.5 : 0.3, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
-      
+
       ctx.restore();
     }
 
@@ -552,80 +617,80 @@
       const gap = PIPE_GAP * s;
       const capHeight = 25 * s;
       const capWidth = (PIPE_WIDTH + 10) * s;
-      
+
       // Neon glow effect
       ctx.shadowColor = '#00ffff';
       ctx.shadowBlur = 15 * s;
-      
+
       // Top pipe
       ctx.fillStyle = '#0d3d3d';
       ctx.fillRect(x, 0, width, gapY);
       ctx.strokeStyle = '#00ffff';
       ctx.lineWidth = 2 * s;
       ctx.strokeRect(x, 0, width, gapY);
-      
+
       // Top pipe cap
       ctx.fillStyle = '#0a4a4a';
       ctx.fillRect(x - 5 * s, gapY - capHeight, capWidth, capHeight);
       ctx.strokeRect(x - 5 * s, gapY - capHeight, capWidth, capHeight);
-      
+
       // Bottom pipe
       ctx.fillStyle = '#0d3d3d';
       ctx.fillRect(x, gapY + gap, width, BASE_HEIGHT * s - gapY - gap);
       ctx.strokeRect(x, gapY + gap, width, BASE_HEIGHT * s - gapY - gap);
-      
+
       // Bottom pipe cap
       ctx.fillStyle = '#0a4a4a';
       ctx.fillRect(x - 5 * s, gapY + gap, capWidth, capHeight);
       ctx.strokeRect(x - 5 * s, gapY + gap, capWidth, capHeight);
-      
+
       ctx.shadowBlur = 0;
     }
 
     function drawScore() {
       ctx.shadowColor = '#00ffff';
       ctx.shadowBlur = 20 * scale;
-      
+
       ctx.fillStyle = '#00ffff';
       ctx.font = `bold ${72 * scale}px Arial Black, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      
+
       // Shadow layers for depth
       ctx.fillStyle = '#004444';
       ctx.fillText(score, BASE_WIDTH * scale / 2 + 4 * scale, 40 * scale + 4 * scale);
       ctx.fillStyle = '#00ffff';
       ctx.fillText(score, BASE_WIDTH * scale / 2, 40 * scale);
-      
+
       ctx.shadowBlur = 0;
     }
 
     function drawStartScreen() {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
+
       ctx.shadowColor = '#00ffff';
       ctx.shadowBlur = 20 * scale;
-      
+
       ctx.fillStyle = '#00ffff';
       ctx.font = `bold ${36 * scale}px Arial, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('🐦 BAFILYRD 🐦', BASE_WIDTH * scale / 2, BASE_HEIGHT * scale / 2 - 50 * scale);
-      
+
       // Start button
       const btnX = BASE_WIDTH * scale / 2 - 80 * scale;
       const btnY = BASE_HEIGHT * scale / 2;
       const btnW = 160 * scale;
       const btnH = 50 * scale;
-      
+
       ctx.fillStyle = '#00ffff';
       ctx.beginPath();
       ctx.roundRect(btnX, btnY, btnW, btnH, 25 * scale);
       ctx.fill();
-      
+
       ctx.shadowBlur = 0;
-      
+
       ctx.fillStyle = '#0a0a0a';
       ctx.font = `bold ${20 * scale}px Arial, sans-serif`;
       ctx.textAlign = 'center';
@@ -636,30 +701,30 @@
     function drawGameOverScreen() {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
+
       ctx.shadowColor = '#ff0055';
       ctx.shadowBlur = 20 * scale;
-      
+
       ctx.fillStyle = '#ff0055';
       ctx.font = `bold ${36 * scale}px Arial, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('GAME OVER', BASE_WIDTH * scale / 2, BASE_HEIGHT * scale / 2 - 50 * scale);
-      
+
       // Play again button
       const btnX = BASE_WIDTH * scale / 2 - 100 * scale;
       const btnY = BASE_HEIGHT * scale / 2;
       const btnW = 200 * scale;
       const btnH = 50 * scale;
-      
+
       ctx.shadowColor = '#00ff88';
       ctx.fillStyle = '#00ff88';
       ctx.beginPath();
       ctx.roundRect(btnX, btnY, btnW, btnH, 25 * scale);
       ctx.fill();
-      
+
       ctx.shadowBlur = 0;
-      
+
       ctx.fillStyle = '#0a0a0a';
       ctx.font = `bold ${20 * scale}px Arial, sans-serif`;
       ctx.textAlign = 'center';
@@ -671,15 +736,15 @@
     function render() {
       // Clear canvas (transparent to show rune background)
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
+
       for (const pipe of pipes) {
         drawPipe(pipe);
       }
-      
+
       for (const bird of birds) {
         drawBird(bird);
       }
-      
+
       if (gameState === 'playing') {
         drawScore();
       } else if (gameState === 'start') {
@@ -699,7 +764,7 @@
       if (gameState === 'playing') {
         update(deltaTime, currentTime);
       }
-      
+
       render();
       requestAnimationFrame(gameLoop);
     }
@@ -717,7 +782,7 @@
 
     canvas.addEventListener('click', (e) => {
       const { x, y } = getGameCoords(e);
-      
+
       if (gameState === 'playing') {
         mouseX = x;
         mouseY = y;
@@ -736,7 +801,7 @@
     canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
       const { x, y } = getGameCoords(e);
-      
+
       if (gameState === 'playing') {
         mouseX = x;
         mouseY = y;
@@ -761,7 +826,9 @@
 
     // Start
     resize();
+    initRemixSDK();
     requestAnimationFrame(gameLoop);
   </script>
 </body>
+
 </html>
