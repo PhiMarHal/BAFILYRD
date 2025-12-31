@@ -290,6 +290,10 @@
     const INITIAL_PIPE_INTERVAL = 400;
     const INITIAL_BIRDS = 128;
     const FLAP_RADIUS = 64;
+
+    // Mobile detection for performance optimization
+    const IS_MOBILE = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
     const FLAP_MAX_DELAY = 200;
     const PIPES_PER_COLOR = 8;
 
@@ -687,9 +691,11 @@
       const s = scale;
       const size = BIRD_SIZE * s;
 
-      // Glow effect
-      ctx.shadowColor = bird.color;
-      ctx.shadowBlur = 10 * s;
+      // Glow effect - skip on mobile for performance
+      if (!IS_MOBILE) {
+        ctx.shadowColor = bird.color;
+        ctx.shadowBlur = 10 * s;
+      }
 
       // Body
       ctx.fillStyle = bird.color;
