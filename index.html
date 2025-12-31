@@ -469,6 +469,9 @@
 
     // Start game
     function startGame() {
+      if (gameState === "playing") return; // <-- critical to stop Remix spam resets
+
+
       startMusic(); // Start background music on first game start
       initBirds();
       pipes = [];
@@ -898,6 +901,22 @@
       requestAnimationFrame(gameLoop);
     }
 
+    // Helpers
+    function isInsideButton(x, y, btnX, btnY, btnW, btnH) {
+      return x >= btnX && x <= btnX + btnW && y >= btnY && y <= btnY + btnH;
+    }
+
+    function handleStartClick(x, y) {
+      const btnW = gameState === "start" ? 160 : 200;
+      const btnH = 50;
+      const btnX = BASE_WIDTH / 2 - btnW / 2;
+      const btnY = BASE_HEIGHT / 2;
+
+      if (isInsideButton(x, y, btnX, btnY, btnW, btnH)) {
+        startGame();
+      }
+    }
+
     // Event handlers
     function getGameCoords(e) {
       const rect = canvas.getBoundingClientRect();
@@ -909,15 +928,15 @@
       };
     }
 
-    canvas.addEventListener('click', (e) => {
+    canvas.addEventListener("click", (e) => {
       const { x, y } = getGameCoords(e);
 
-      if (gameState === 'playing') {
+      if (gameState === "playing") {
         mouseX = x;
         mouseY = y;
         flapAt(x, y);
       } else {
-        startGame();
+        handleStartClick(x, y);
       }
     });
 
@@ -927,27 +946,31 @@
       mouseY = y;
     });
 
-    canvas.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      const { x, y } = getGameCoords(e);
-
-      if (gameState === 'playing') {
-        mouseX = x;
-        mouseY = y;
-        flapAt(x, y);
-      } else {
-        startGame();
-      }
-    }, { passive: false });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') {
+    canvas.addEventListener(
+      "touchstart",
+      (e) => {
         e.preventDefault();
-        if (gameState === 'playing') {
-          flapAt(mouseX, mouseY);
+        const { x, y } = getGameCoords(e);
+
+        if (gameState === "playing") {
+          mouseX = x;
+          mouseY = y;
+          flapAt(x, y);
         } else {
-          startGame();
+          handleStartClick(x, y);
         }
+      },
+      { passive: false },
+    );
+
+    document.addEventListener("keydown", (e) => {
+      if (e.code !== "Space") return;
+      if (e.repeat) return;
+
+      e.preventDefault();
+
+      if (gameState === "playing") {
+        flapAt(mouseX, mouseY);
       }
     });
 
