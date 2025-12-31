@@ -134,8 +134,8 @@
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
 
-    // Base game dimensions (1:2 ratio)
-    const BASE_WIDTH = 360;
+    // Base game dimensions (2:3 ratio)
+    const BASE_WIDTH = 480;
     const BASE_HEIGHT = 720;
 
     // Music configuration
@@ -149,6 +149,7 @@
     let currentTrackIndex = 0;
     let audioElement = null;
     let musicStarted = false;
+    let isTransitioning = false;
 
     // Shuffle array (Fisher-Yates)
     function shuffleArray(array) {
@@ -175,7 +176,8 @@
 
     // Play next track
     function playNextTrack() {
-      if (!musicStarted) return;
+      if (!musicStarted || isTransitioning) return;
+      isTransitioning = true;
 
       // If we've played all tracks, reshuffle
       if (currentTrackIndex >= musicPlaylist.length) {
@@ -186,34 +188,49 @@
       const trackPath = musicPlaylist[currentTrackIndex];
       currentTrackIndex++;
 
+      // Clean up old audio element completely
       if (audioElement) {
         audioElement.pause();
-        audioElement.src = '';
+        audioElement.removeAttribute('src');
+        audioElement.load();
+        audioElement = null;
       }
 
-      audioElement = new Audio(trackPath);
+      // Create fresh audio element
+      audioElement = new Audio();
       audioElement.volume = 0.5;
 
-      audioElement.addEventListener('ended', () => {
+      // Set up event handlers BEFORE setting src
+      audioElement.onended = () => {
+        isTransitioning = false;
         // Wait for silence period, then play next
         setTimeout(playNextTrack, SILENCE_BETWEEN_TRACKS);
-      });
+      };
 
-      audioElement.addEventListener('error', (e) => {
-        console.warn('Could not load track:', trackPath, e);
+      audioElement.onerror = () => {
+        console.warn('Could not load track:', trackPath);
+        isTransitioning = false;
         // Try next track after a short delay
         setTimeout(playNextTrack, 1000);
-      });
+      };
 
-      audioElement.play().catch(e => {
-        console.warn('Playback failed:', e);
-      });
+      audioElement.oncanplaythrough = () => {
+        isTransitioning = false;
+        audioElement.play().catch(e => {
+          console.warn('Playback failed:', e);
+        });
+      };
+
+      // Now set the source
+      audioElement.src = trackPath;
+      audioElement.load();
     }
 
     // Start music (call after user interaction)
     function startMusic() {
       if (musicStarted) return;
       musicStarted = true;
+      isTransitioning = false;
       musicPlaylist = generatePlaylist();
       currentTrackIndex = 0;
       playNextTrack();
@@ -274,6 +291,22 @@
     const INITIAL_BIRDS = 128;
     const FLAP_RADIUS = 64;
     const FLAP_MAX_DELAY = 200;
+    const PIPES_PER_COLOR = 16;
+
+    // Color themes: [glow/stroke, fill dark, fill light]
+    const COLOR_THEMES = [
+      { glow: '#00ffff', dark: '#0d3d3d', light: '#0a4a4a' }, // Cyan
+      { glow: '#ff3366', dark: '#3d0d1a', light: '#4a0a20' }, // Red/Pink
+      { glow: '#00ff88', dark: '#0d3d2a', light: '#0a4a35' }, // Green
+      { glow: '#aa66ff', dark: '#2a0d3d', light: '#350a4a' }, // Purple
+      { glow: '#ffaa00', dark: '#3d2a0d', light: '#4a350a' }, // Orange
+      { glow: '#ff66aa', dark: '#3d0d2a', light: '#4a0a35' }, // Pink
+      { glow: '#66ffaa', dark: '#0d3d2a', light: '#0a4a35' }, // Mint
+      { glow: '#ffff00', dark: '#3d3d0d', light: '#4a4a0a' }, // Yellow
+    ];
+
+    let currentColorIndex = 0;
+    let pipesPassed = 0;
 
     const BIRD_COLORS = [
       '#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
@@ -385,7 +418,14 @@
       lastPipeDistance = 0;
       lastTime = null;
       pendingFlaps = [];
+      currentColorIndex = 0;
+      pipesPassed = 0;
       gameState = 'playing';
+
+      // Make all birds flap once at the start
+      for (const bird of birds) {
+        bird.vy = FLAP_VELOCITY;
+      }
     }
 
     // Spawn birds from pipe
@@ -527,6 +567,13 @@
           if (aliveBirds.length > 0) {
             score += aliveBirds.length;
             currentPipeSpeed += SPEED_INCREMENT; // Linear speed increase
+            pipesPassed++;
+
+            // Change color every 16 pipes
+            if (pipesPassed % PIPES_PER_COLOR === 0) {
+              currentColorIndex = (currentColorIndex + 1) % COLOR_THEMES.length;
+            }
+
             spawnBirdsFromPipe(pipe);
           }
         }
@@ -618,29 +665,31 @@
       const capHeight = 25 * s;
       const capWidth = (PIPE_WIDTH + 10) * s;
 
+      const theme = COLOR_THEMES[currentColorIndex];
+
       // Neon glow effect
-      ctx.shadowColor = '#00ffff';
+      ctx.shadowColor = theme.glow;
       ctx.shadowBlur = 15 * s;
 
       // Top pipe
-      ctx.fillStyle = '#0d3d3d';
+      ctx.fillStyle = theme.dark;
       ctx.fillRect(x, 0, width, gapY);
-      ctx.strokeStyle = '#00ffff';
+      ctx.strokeStyle = theme.glow;
       ctx.lineWidth = 2 * s;
       ctx.strokeRect(x, 0, width, gapY);
 
       // Top pipe cap
-      ctx.fillStyle = '#0a4a4a';
+      ctx.fillStyle = theme.light;
       ctx.fillRect(x - 5 * s, gapY - capHeight, capWidth, capHeight);
       ctx.strokeRect(x - 5 * s, gapY - capHeight, capWidth, capHeight);
 
       // Bottom pipe
-      ctx.fillStyle = '#0d3d3d';
+      ctx.fillStyle = theme.dark;
       ctx.fillRect(x, gapY + gap, width, BASE_HEIGHT * s - gapY - gap);
       ctx.strokeRect(x, gapY + gap, width, BASE_HEIGHT * s - gapY - gap);
 
       // Bottom pipe cap
-      ctx.fillStyle = '#0a4a4a';
+      ctx.fillStyle = theme.light;
       ctx.fillRect(x - 5 * s, gapY + gap, capWidth, capHeight);
       ctx.strokeRect(x - 5 * s, gapY + gap, capWidth, capHeight);
 
@@ -648,31 +697,34 @@
     }
 
     function drawScore() {
-      ctx.shadowColor = '#00ffff';
+      const theme = COLOR_THEMES[currentColorIndex];
+
+      ctx.shadowColor = theme.glow;
       ctx.shadowBlur = 20 * scale;
 
-      ctx.fillStyle = '#00ffff';
       ctx.font = `bold ${72 * scale}px Arial Black, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
 
-      // Shadow layers for depth
-      ctx.fillStyle = '#004444';
+      // Shadow layer for depth (darker version of glow)
+      ctx.fillStyle = theme.dark;
       ctx.fillText(score, BASE_WIDTH * scale / 2 + 4 * scale, 40 * scale + 4 * scale);
-      ctx.fillStyle = '#00ffff';
+      ctx.fillStyle = theme.glow;
       ctx.fillText(score, BASE_WIDTH * scale / 2, 40 * scale);
 
       ctx.shadowBlur = 0;
     }
 
     function drawStartScreen() {
+      const theme = COLOR_THEMES[currentColorIndex];
+
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.shadowColor = '#00ffff';
+      ctx.shadowColor = theme.glow;
       ctx.shadowBlur = 20 * scale;
 
-      ctx.fillStyle = '#00ffff';
+      ctx.fillStyle = theme.glow;
       ctx.font = `bold ${36 * scale}px Arial, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -684,7 +736,7 @@
       const btnW = 160 * scale;
       const btnH = 50 * scale;
 
-      ctx.fillStyle = '#00ffff';
+      ctx.fillStyle = theme.glow;
       ctx.beginPath();
       ctx.roundRect(btnX, btnY, btnW, btnH, 25 * scale);
       ctx.fill();
@@ -699,6 +751,10 @@
     }
 
     function drawGameOverScreen() {
+      // Only show overlay and UI if Remix SDK is NOT present
+      // (Remix handles its own game over UI)
+      if (window.FarcadeSDK) return;
+
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
